@@ -37,12 +37,15 @@ This module requires the [AWS CloudWatch Logs Handler for Monolog](https://githu
 
 ## Installation
 
-1. Copy this module to your Drupal installation's `modules/custom` directory
-2. Install dependencies using Composer:
+1. Install dependencies using Composer:
     ```bash
     composer require phpnexus/cwh:^3.0
     ```
-2. Enable the module:
+2. Install this module using Composer (add custom repository first):
+    ```bash
+    composer require uceap/uceap_logging:@dev
+    ```
+4. Enable the module:
     ```bash
     drush pm:enable uceap_logging -y
     ```
