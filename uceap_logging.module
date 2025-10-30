@@ -1,0 +1,224 @@
+<?php
+
+/**
+ * @file
+ * Provides logging for HTTP requests and entity CRUD operations.
+ */
+
+use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
+
+/**
+ * Implements hook_entity_insert().
+ *
+ * Log all content entity insertions to watchdog.
+ */
+function uceap_logging_entity_insert(EntityInterface $entity) {
+  if (!$entity instanceof ContentEntityInterface) {
+    return;
+  }
+
+  $context = _uceap_logging_build_entity_log_context($entity, 'create');
+  \Drupal::logger('myeap_entity_crud')->info('Created @type (@bundle): @label (ID: @id)', $context);
+}
+
+/**
+ * Implements hook_entity_update().
+ *
+ * Log all content entity updates to watchdog.
+ */
+function uceap_logging_entity_update(EntityInterface $entity) {
+  if (!$entity instanceof ContentEntityInterface) {
+    return;
+  }
+
+  $context = _uceap_logging_build_entity_log_context($entity, 'update');
+
+  // Track changed fields if original entity is available.
+  if (isset($entity->original) && $entity->original instanceof ContentEntityInterface) {
+    $changes = _uceap_logging_get_entity_field_changes($entity, $entity->original);
+
+    if (!empty($changes)) {
+      $context['field_changes'] = $changes;
+      $context['@change_count'] = count($changes);
+      \Drupal::logger('myeap_entity_crud')->info('Updated @type (@bundle): @label (ID: @id) | @change_count field(s) changed', $context);
+      return;
+    }
+  }
+
+  \Drupal::logger('myeap_entity_crud')->info('Updated @type (@bundle): @label (ID: @id) | No field changes detected', $context);
+}
+
+/**
+ * Implements hook_entity_delete().
+ *
+ * Log all content entity deletions to watchdog.
+ */
+function uceap_logging_entity_delete(EntityInterface $entity) {
+  if (!$entity instanceof ContentEntityInterface) {
+    return;
+  }
+
+  $context = _uceap_logging_build_entity_log_context($entity, 'delete');
+  \Drupal::logger('myeap_entity_crud')->warning('Deleted @type (@bundle): @label (ID: @id)', $context);
+}
+
+/**
+ * Build structured logging context for entity operations.
+ *
+ * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+ *   The entity being logged.
+ * @param string $operation
+ *   The operation type: 'create', 'update', or 'delete'.
+ *
+ * @return array
+ *   Context array for logger with both message placeholders and structured data.
+ */
+function _uceap_logging_build_entity_log_context(ContentEntityInterface $entity, string $operation) {
+  $entity_type = $entity->getEntityTypeId();
+  $bundle = $entity->bundle();
+  $label = $entity->label() ?: 'N/A';
+  $id = $entity->id();
+
+  return [
+    // Message placeholders (prefixed with @).
+    '@type' => $entity_type,
+    '@bundle' => $bundle,
+    '@label' => $label,
+    '@id' => $id,
+    // Structured data for CloudWatch (no prefix).
+    'entity_type' => $entity_type,
+    'bundle' => $bundle,
+    'entity_id' => $id,
+    'operation' => $operation,
+  ];
+}
+
+/**
+ * Get changed fields between two entity states.
+ *
+ * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+ *   The updated entity.
+ * @param \Drupal\Core\Entity\ContentEntityInterface $original
+ *   The original entity.
+ *
+ * @return array
+ *   Array of changes keyed by field name, with 'old' and 'new' values.
+ */
+function _uceap_logging_get_entity_field_changes(ContentEntityInterface $entity, ContentEntityInterface $original) {
+  // Fields to completely exclude from change tracking.
+  $excluded_fields = [
+    'changed',
+    'revision_timestamp',
+    'revision_uid',
+    'revision_log',
+  ];
+
+  // Sensitive fields that should have values masked in logs.
+  // TODO make this configurable.
+  $sensitive_fields = [
+    'field_ssn',
+    'field_confirm_ssn',
+    'pass',
+  ];
+
+  $changes = [];
+  $field_definitions = $entity->getFieldDefinitions();
+
+  foreach ($field_definitions as $field_name => $field_definition) {
+    // Skip computed and internal fields (they are derived values).
+    if ($field_definition->isComputed() || $field_definition->isInternal()) {
+      continue;
+    }
+
+    // Skip excluded fields entirely.
+    if (in_array($field_name, $excluded_fields)) {
+      continue;
+    }
+
+    // Check if field exists on both entities.
+    if (!$entity->hasField($field_name) || !$original->hasField($field_name)) {
+      continue;
+    }
+
+    $new_value = $entity->get($field_name)->getValue();
+    $old_value = $original->get($field_name)->getValue();
+
+    // Compare values.
+    if ($new_value !== $old_value) {
+      // Mask sensitive field values instead of skipping them.
+      $is_sensitive = in_array($field_name, $sensitive_fields);
+
+      $changes[$field_name] = [
+        'old' => $is_sensitive ? '***MASKED***' : _uceap_logging_format_field_value($old_value),
+        'new' => $is_sensitive ? '***MASKED***' : _uceap_logging_format_field_value($new_value),
+      ];
+    }
+  }
+
+  return $changes;
+}
+
+/**
+ * Helper function to format field values for logging.
+ *
+ * @param mixed $value
+ *   The field value (typically an array from getValue()).
+ *
+ * @return string
+ *   A formatted string representation of the value.
+ */
+function _uceap_logging_format_field_value($value) {
+  if (empty($value)) {
+    return 'empty';
+  }
+
+  // If it's an array, format it appropriately.
+  if (is_array($value)) {
+    // For single-value fields, just show the value.
+    if (count($value) === 1 && isset($value[0])) {
+      $item = $value[0];
+      // Handle common field types.
+      if (isset($item['value'])) {
+        // Truncate long text values.
+        $val = (string) $item['value'];
+        return strlen($val) > 100 ? substr($val, 0, 100) . '...' : $val;
+      }
+      elseif (isset($item['target_id'])) {
+        return "ID:{$item['target_id']}";
+      }
+      elseif (isset($item['uri'])) {
+        return $item['uri'];
+      }
+      else {
+        // For other complex items, show key fields.
+        $parts = [];
+        foreach ($item as $key => $val) {
+          if (!is_array($val) && !is_object($val)) {
+            $parts[] = "$key:$val";
+          }
+        }
+        return implode(',', $parts);
+      }
+    }
+    // For multi-value fields, show count and summary.
+    else {
+      $count = count($value);
+      $first_item = reset($value);
+      if (isset($first_item['target_id'])) {
+        $ids = array_column($value, 'target_id');
+        return "$count items [IDs:" . implode(',', array_slice($ids, 0, 5)) . (count($ids) > 5 ? '...' : '') . ']';
+      }
+      elseif (isset($first_item['value'])) {
+        return "$count values";
+      }
+      else {
+        return "$count items";
+      }
+    }
+  }
+
+  // For scalar values.
+  $str = (string) $value;
+  return strlen($str) > 100 ? substr($str, 0, 100) . '...' : $str;
+}

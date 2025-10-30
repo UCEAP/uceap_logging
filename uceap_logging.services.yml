@@ -1,0 +1,12 @@
+services:
+  uceap_logging.request_logger_subscriber:
+    class: Drupal\uceap_logging\EventSubscriber\RequestLoggerSubscriber
+    arguments: ['@logger.factory', '@current_user']
+    tags:
+      - { name: event_subscriber }
+
+  uceap_logging.session_processor:
+    class: Drupal\uceap_logging\Logger\SessionProcessor
+    arguments: ['@request_stack']
+    tags:
+      - { name: monolog.processor }

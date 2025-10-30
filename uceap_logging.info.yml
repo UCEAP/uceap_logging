@@ -1,0 +1,9 @@
+name: UCEAP Logging
+description: 'Provides comprehensive logging for HTTP requests and entity CRUD operations with CloudWatch integration.'
+type: module
+core_version_requirement: ^10 || ^11
+package: UCEAP
+
+dependencies:
+  - key:key
+  - monolog:monolog
