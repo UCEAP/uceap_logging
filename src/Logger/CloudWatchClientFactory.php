@@ -19,46 +19,25 @@ use PhpNexus\Cwh\Handler\CloudWatch;
  * - aws_access_key_id: AWS access key
  * - aws_secret_access_key: AWS secret key
  */
-class CloudWatchClientFactory {
+abstract class CloudWatchClientFactory {
 
   /**
    * Creates and returns an AWS CloudWatch Logs client.
    *
-   * Retrieves AWS credentials from environment variables, with fallback to
-   * the Drupal Key module if available.
-   *
-   * @param string|null $access_key_id
-   *   Optional AWS access key ID. If not provided, will be retrieved from
-   *   environment or Key module.
-   * @param string|null $secret_access_key
-   *   Optional AWS secret access key. If not provided, will be retrieved from
-   *   environment or Key module.
-   * @param string $region
-   *   AWS region. Defaults to 'us-west-2'.
+   * Retrieves AWS credentials from helper methods implemented in a subclass.
    *
    * @return \Aws\CloudWatchLogs\CloudWatchLogsClient
    *   The configured CloudWatch Logs client.
    */
-  public static function create($access_key_id = NULL, $secret_access_key = NULL, $region = 'us-west-2') {
+  public static function create() {
     $config = [
       'version' => 'latest',
-      'region' => $region,
+      'region' => 'us-west-2',
+      'credentials' => [
+        'key' => static::getAwsAccessKeyId(),
+        'secret' => static::getAwsSecretAccessKey(),
+      ],
     ];
-
-    // Get AWS credentials if not provided.
-    if ($access_key_id === NULL) {
-      $access_key_id = self::getAwsCredential('aws_access_key_id');
-    }
-    if ($secret_access_key === NULL) {
-      $secret_access_key = self::getAwsCredential('aws_secret_access_key');
-    }
-
-    if (!empty($access_key_id) && !empty($secret_access_key)) {
-      $config['credentials'] = [
-        'key' => $access_key_id,
-        'secret' => $secret_access_key,
-      ];
-    }
 
     return new CloudWatchLogsClient($config);
   }
@@ -66,29 +45,23 @@ class CloudWatchClientFactory {
   /**
    * Creates and returns a configured CloudWatch handler.
    *
-   * @param string $level
-   *   The minimum logging level (DEBUG, INFO, WARNING, ERROR, etc.).
-   * @param string|null $log_group
-   *   Optional log group name. If not provided, will use environment-based
-   *   default.
-   * @param string $log_stream
-   *   Log stream name. Defaults to 'drupal'.
+   * @param string|null $level
+   *   (Optional) minimum logging level (DEBUG, INFO, WARNING, ERROR, etc.).
+   *   Defaults to 'INFO'.
    *
    * @return \Maxbanton\Cwh\Handler\CloudWatch
    *   The configured CloudWatch handler.
    */
-  public static function createHandler($level = 'DEBUG', $log_group = NULL, $log_stream = 'drupal') {
-    $client = self::create();
-
-    // Determine log group if not provided.
-    if ($log_group === NULL) {
-      $log_group = self::getDefaultLogGroup();
-    }
+  public static function createHandler($level = 'INFO') {
+    $client = static::create();
 
     // Log group is managed by Terraform.
     $createGroup = FALSE;
     $createStream = FALSE;
     $retention = NULL;
+    // QUESTION should these be customizable?
+    $log_group = static::getLogGroup();
+    $log_stream = 'drupal';
     // We default to bubbling just like other Monolog handlers.
     $bubble = TRUE;
     // Default is 10000 but we have to pass it explicitly.
@@ -109,74 +82,27 @@ class CloudWatchClientFactory {
   }
 
   /**
-   * Get AWS credential from environment or Key module.
-   *
-   * @param string $key
-   *   The credential key name (lowercase, e.g., 'aws_access_key_id').
+   * Get AWS Access Key ID.
    *
    * @return string|null
-   *   The credential value, or NULL if not found.
+   *   The AWS Access Key ID value, or NULL if not found.
    */
-  protected static function getAwsCredential($key) {
-    // First check environment variable (uppercase).
-    $env_key = strtoupper($key);
-    $value = getenv($env_key);
-
-    // Fall back to Key module if environment variable not set.
-    if (empty($value) && \Drupal::hasService('key.repository')) {
-      try {
-        $key_repository = \Drupal::service('key.repository');
-        $key_entity = $key_repository->getKey($key);
-        if ($key_entity) {
-          $value = $key_entity->getKeyValue();
-        }
-      }
-      catch (\Exception $e) {
-        // Key module not available or key not found.
-        $value = NULL;
-      }
-    }
-
-    return $value;
-  }
+  abstract public static function getAwsAccessKeyId();
 
   /**
-   * Get default log group based on environment.
+   * Get AWS Secret Access Key.
+   *
+   * @return string|null
+   *   The AWS Secret Access Key value, or NULL if not found.
+   */
+  abstract public static function getAwsSecretAccessKey();
+
+  /**
+   * Get log group.
    *
    * @return string
    *   The log group name.
    */
-  protected static function getDefaultLogGroup() {
-    // Try to detect environment.
-    $environment = 'local';
-
-    // Check if myeap_core.environment service exists.
-    if (\Drupal::hasService('myeap_core.environment')) {
-      try {
-        $env_service = \Drupal::service('myeap_core.environment');
-        $env_name = $env_service->getName();
-        $environment = match ($env_name) {
-          'live' => 'live',
-          'test' => 'test',
-          'dev' => 'dev',
-          default => 'local',
-        };
-      }
-      catch (\Exception $e) {
-        // Service not available, stick with default.
-      }
-    }
-    // Fall back to Pantheon environment variable.
-    elseif ($pantheon_env = getenv('PANTHEON_ENVIRONMENT')) {
-      $environment = match ($pantheon_env) {
-        'live' => 'live',
-        'test' => 'test',
-        'dev' => 'dev',
-        default => 'local',
-      };
-    }
-
-    return '/myeap2/' . $environment;
-  }
+  abstract public static function getLogGroup();
 
 }

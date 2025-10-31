@@ -50,6 +50,10 @@ This module requires the [AWS CloudWatch Logs Handler for Monolog](https://githu
     drush pm:enable uceap_logging -y
     ```
 
+## Setup
+
+Subclass the `CloudWatchClientFactory` to configure AWS credentials and log group/stream names as needed.
+
 ## Usage
 
 Once enabled, the module automatically logs:
@@ -71,7 +75,9 @@ drush watchdog:show | grep -E "(uceap_request|uceap_entity_crud)"
 
 ## CloudWatch Integration
 
-This module includes a `CloudWatchClientFactory` class that simplifies integration with AWS CloudWatch Logs.
+This module includes a `CloudWatchClientFactory` class that simplifies
+integration with AWS CloudWatch Logs. You'll need to configure Monolog to use
+your subclassed factory to send logs to CloudWatch.
 
 ### Example: Monolog Integration
 
@@ -81,7 +87,7 @@ Create or update `web/sites/default/monolog.services.yml`:
 services:
   monolog.handler.cloudwatch:
     class: PhpNexus\Cwh\Handler\CloudWatch
-    factory: ['Drupal\uceap_logging\Logger\CloudWatchClientFactory', 'createHandler']
+    factory: ['Drupal\my_module\Logger\CloudWatchClientFactory', 'createHandler']
     arguments: ['DEBUG']  # Log level
 
 parameters:
