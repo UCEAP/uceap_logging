@@ -36,7 +36,7 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
    *   The current user.
    */
   public function __construct(LoggerChannelFactoryInterface $logger_factory, AccountInterface $current_user) {
-    $this->logger = $logger_factory->get('myeap_request');
+    $this->logger = $logger_factory->get('uceap_request');
     $this->currentUser = $current_user;
   }
 

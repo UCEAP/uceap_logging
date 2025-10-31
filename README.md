@@ -5,7 +5,7 @@ A reusable Drupal module that provides comprehensive logging for HTTP requests a
 ## Features
 
 ### 1. HTTP Request Logging
-- Logs every HTTP request to the `myeap_request` channel
+- Logs every HTTP request to the `uceap_request` channel
 - Captures:
   - HTTP method and URI
   - User ID and username
@@ -14,7 +14,7 @@ A reusable Drupal module that provides comprehensive logging for HTTP requests a
   - Referer
 
 ### 2. Entity CRUD Logging
-- Logs all content entity create, update, and delete operations to the `myeap_entity_crud` channel
+- Logs all content entity create, update, and delete operations to the `uceap_entity_crud` channel
 - For **create** operations:
   - Entity type, bundle, label, and ID
 - For **update** operations:
@@ -57,13 +57,13 @@ Once enabled, the module automatically logs:
 
 ```bash
 # View all request logs
-drush watchdog:show --type=myeap_request
+drush watchdog:show --type=uceap_request
 
 # View all entity CRUD logs
-drush watchdog:show --type=myeap_entity_crud
+drush watchdog:show --type=uceap_entity_crud
 
 # View recent logs
-drush watchdog:show | grep -E "(myeap_request|myeap_entity_crud)"
+drush watchdog:show | grep -E "(uceap_request|uceap_entity_crud)"
 ```
 
 ## CloudWatch Integration
@@ -117,7 +117,7 @@ When integrated with Monolog and CloudWatch, logs are automatically sent to Clou
     }
   },
   "level": "INFO",
-  "channel": "myeap_entity_crud"
+  "channel": "uceap_entity_crud"
 }
 ```
 
@@ -141,8 +141,8 @@ To customize which fields are masked, modify the `$sensitive_fields` array in `_
 
 ### Logger Channels
 
-- **Request logging**: `myeap_request`
-- **Entity logging**: `myeap_entity_crud`
+- **Request logging**: `uceap_request`
+- **Entity logging**: `uceap_entity_crud`
 
 To change these channel names, update the logger calls in:
 - `src/EventSubscriber/RequestLoggerSubscriber.php` (line 39)

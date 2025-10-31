@@ -19,7 +19,7 @@ function uceap_logging_entity_insert(EntityInterface $entity) {
   }
 
   $context = _uceap_logging_build_entity_log_context($entity, 'create');
-  \Drupal::logger('myeap_entity_crud')->info('Created @type (@bundle): @label (ID: @id)', $context);
+  \Drupal::logger('uceap_entity_crud')->info('Created @type (@bundle): @label (ID: @id)', $context);
 }
 
 /**
@@ -41,12 +41,12 @@ function uceap_logging_entity_update(EntityInterface $entity) {
     if (!empty($changes)) {
       $context['field_changes'] = $changes;
       $context['@change_count'] = count($changes);
-      \Drupal::logger('myeap_entity_crud')->info('Updated @type (@bundle): @label (ID: @id) | @change_count field(s) changed', $context);
+      \Drupal::logger('uceap_entity_crud')->info('Updated @type (@bundle): @label (ID: @id) | @change_count field(s) changed', $context);
       return;
     }
   }
 
-  \Drupal::logger('myeap_entity_crud')->info('Updated @type (@bundle): @label (ID: @id) | No field changes detected', $context);
+  \Drupal::logger('uceap_entity_crud')->info('Updated @type (@bundle): @label (ID: @id) | No field changes detected', $context);
 }
 
 /**
@@ -60,7 +60,7 @@ function uceap_logging_entity_delete(EntityInterface $entity) {
   }
 
   $context = _uceap_logging_build_entity_log_context($entity, 'delete');
-  \Drupal::logger('myeap_entity_crud')->warning('Deleted @type (@bundle): @label (ID: @id)', $context);
+  \Drupal::logger('uceap_entity_crud')->warning('Deleted @type (@bundle): @label (ID: @id)', $context);
 }
 
 /**
