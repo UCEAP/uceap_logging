@@ -40,6 +40,7 @@ This module requires the [AWS CloudWatch Logs Handler for Monolog](https://githu
 1. Install dependencies using Composer:
     ```bash
     composer require phpnexus/cwh:^3.0
+    composer require 'drupal/monolog:^3.0'
     ```
 2. Install this module using Composer (add custom repository first):
     ```bash
