@@ -72,9 +72,7 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
    * {@inheritdoc}
    */
   public static function getSubscribedEvents() {
-    // Set priority to 50 so it runs early but after most routing logic.
-    $events[KernelEvents::REQUEST][] = ['onKernelRequest', 50];
-    return $events;
+    return [];
   }
 
 }
