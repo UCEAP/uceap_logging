@@ -4,6 +4,7 @@ namespace Drupal\uceap_logging\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\field\Entity\FieldStorageConfig;
 
 /**
  * Configure UCEAP Logging settings.
@@ -30,12 +31,21 @@ class LoggingSettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state) {
     $config = $this->config('uceap_logging.settings');
 
+    $fields = \Drupal::entityTypeManager()
+      ->getStorage('field_storage_config')
+      ->loadMultiple();
+
+    $field_names = [];
+    foreach($fields as $field_key => $field_value) {
+      $field_names[$field_value->getName()] = $field_value->getName();
+    }
+
     $form['sensitive_fields'] = [
-      '#type' => 'textarea',
-      '#title' => $this->t('Sensitive Fields'),
-      '#description' => $this->t('Enter field machine names (one per line) that should have their values masked in entity change logs. When these fields are modified, they will appear in logs with masked values (e.g., ***MASKED***) instead of actual values.'),
-      '#default_value' => implode("\n", $config->get('sensitive_fields') ?? []),
-      '#rows' => 10,
+      '#type' => 'select2',
+      '#title' => $this->t('Selectable Sensitive Fields'),
+      '#options' => $field_names,
+      '#multiple' => TRUE,
+      '#default_value' => $config->get('sensitive_fields') ?? [],
     ];
 
     $form['help'] = [
@@ -63,17 +73,10 @@ class LoggingSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    // Convert textarea input to array.
-    $sensitive_fields_raw = $form_state->getValue('sensitive_fields');
-    $sensitive_fields = array_filter(
-      array_map('trim', explode("\n", $sensitive_fields_raw)),
-      function ($field) {
-        return !empty($field);
-      }
-    );
+    $selectable_sensitive_fields_raw = $form_state->getValue('sensitive_fields');
 
     $this->config('uceap_logging.settings')
-      ->set('sensitive_fields', array_values($sensitive_fields))
+      ->set('sensitive_fields', array_values($selectable_sensitive_fields_raw))
       ->save();
 
     parent::submitForm($form, $form_state);
