@@ -110,6 +110,7 @@ function _uceap_logging_get_entity_field_changes(ContentEntityInterface $entity,
   $excluded_fields = [
     'changed',
     'revision_timestamp',
+    'revision_translation_affected',
     'revision_uid',
     'revision_log',
   ];
