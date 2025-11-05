@@ -150,8 +150,8 @@ function _uceap_logging_get_entity_field_changes(ContentEntityInterface $entity,
       $is_sensitive = in_array($field_name, $sensitive_fields);
 
       $changes[$field_name] = [
-        'old' => $is_sensitive ? '***MASKED***' : _uceap_logging_format_field_value($old_value),
-        'new' => $is_sensitive ? '***MASKED***' : _uceap_logging_format_field_value($new_value),
+        'old' => $is_sensitive ? '****MASKED****' : _uceap_logging_format_field_value($old_value),
+        'new' => $is_sensitive ? '****MASKED****' : _uceap_logging_format_field_value($new_value),
       ];
     }
   }

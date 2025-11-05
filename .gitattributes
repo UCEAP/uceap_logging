@@ -1,10 +1,10 @@
 # based on https://www.drupal.org/docs/develop/git/setting-up-git-for-drupal/configuring-git-for-drupal#s-configuring-attributes-for-improved-diffs
 
-*.engine   diff=php
-*.inc      diff=php
-*.install  diff=php
-*.module   diff=php
-*.php      diff=php
-*.profile  diff=php
-*.test     diff=php
-*.theme    diff=php
+*.engine   diff=php linguist-language=php
+*.inc      diff=php linguist-language=php
+*.install  diff=php linguist-language=php
+*.module   diff=php linguist-language=php
+*.php      diff=php linguist-language=php
+*.profile  diff=php linguist-language=php
+*.test     diff=php linguist-language=php
+*.theme    diff=php linguist-language=php
