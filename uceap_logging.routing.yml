@@ -5,3 +5,10 @@ uceap_logging.settings:
     _title: 'Logging Settings'
   requirements:
     _permission: 'administer site configuration'
+
+uceap_logging.field_list:
+  path: '/field-list'
+  defaults:
+    _controller: '\Drupal\uceap_logging\Controller\FieldList::autocomplete'
+  requirements:
+    _permission: 'access content'

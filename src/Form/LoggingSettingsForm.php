@@ -4,6 +4,7 @@ namespace Drupal\uceap_logging\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\field\Entity\FieldStorageConfig;
 
 /**
  * Configure UCEAP Logging settings.
@@ -31,11 +32,11 @@ class LoggingSettingsForm extends ConfigFormBase {
     $config = $this->config('uceap_logging.settings');
 
     $form['sensitive_fields'] = [
-      '#type' => 'textarea',
-      '#title' => $this->t('Sensitive Fields'),
-      '#description' => $this->t('Enter field machine names (one per line) that should have their values masked in entity change logs. When these fields are modified, they will appear in logs with masked values (e.g., ***MASKED***) instead of actual values.'),
-      '#default_value' => implode("\n", $config->get('sensitive_fields') ?? []),
-      '#rows' => 10,
+      '#type' => 'textfield',
+      '#title' => $this->t('Select Field Machine Name'),
+      '#autocomplete_route_name' => 'uceap_logging.field_list',
+      '#multiple' => TRUE,
+      '#default_value' => implode(', ', $config->get('sensitive_fields')) ?? [],
     ];
 
     $form['help'] = [
@@ -63,17 +64,10 @@ class LoggingSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    // Convert textarea input to array.
-    $sensitive_fields_raw = $form_state->getValue('sensitive_fields');
-    $sensitive_fields = array_filter(
-      array_map('trim', explode("\n", $sensitive_fields_raw)),
-      function ($field) {
-        return !empty($field);
-      }
-    );
+    $selectable_sensitive_fields_raw = explode(",", $form_state->getValue('sensitive_fields'));
 
     $this->config('uceap_logging.settings')
-      ->set('sensitive_fields', array_values($sensitive_fields))
+      ->set('sensitive_fields', array_values($selectable_sensitive_fields_raw))
       ->save();
 
     parent::submitForm($form, $form_state);
