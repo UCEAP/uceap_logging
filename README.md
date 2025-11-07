@@ -135,19 +135,28 @@ When integrated with Monolog and CloudWatch, logs are automatically sent to Clou
 
 ### Sensitive Field Masking
 
-By default, the following sensitive fields have their values masked in logs:
+The module provides configurable masking of sensitive field values in entity change logs. When sensitive fields are modified, they appear in logs with masked values (e.g., `***MASKED***`) instead of actual values, providing an audit trail while protecting sensitive data.
+
+#### Default Sensitive Fields
+
+By default, the following field has its value masked:
 - `pass` - User passwords
-- `uuid` - Entity UUIDs
-- `revision_timestamp` - Revision timestamps
-- `revision_uid` - Revision authors
-- `revision_log` - Revision log messages
-- `changed` - Changed timestamps
 
-When these fields are modified, they appear in the logs with masked values (e.g., `***MASKED***`) instead of actual values, providing an audit trail while protecting sensitive data.
+#### Configuring Sensitive Fields
 
-Additionally, computed and internal fields are automatically excluded from logging as they are derived values.
+You can customize which fields are masked through the administrative interface:
 
-To customize which fields are masked, modify the `$sensitive_fields` array in `_uceap_logging_get_entity_field_changes()`.
+1. Navigate to **Configuration** > **Development** > **Logging and errors** (`/admin/config/development/logging`)
+2. Click on the **UCEAP Logging** tab
+3. Enter field machine names (one per line) in the "Sensitive Fields" textarea
+4. Click "Save configuration"
+
+#### Automatically Excluded Fields
+
+In addition to user-configured sensitive fields, the following field types are automatically excluded from change tracking entirely:
+- Computed fields (derived values)
+- Internal fields (system-managed)
+- Specific metadata fields: `changed`, `revision_timestamp`, `revision_uid`, `revision_log`
 
 ### Logger Channels
 

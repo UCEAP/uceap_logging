@@ -116,12 +116,8 @@ function _uceap_logging_get_entity_field_changes(ContentEntityInterface $entity,
   ];
 
   // Sensitive fields that should have values masked in logs.
-  // TODO make this configurable.
-  $sensitive_fields = [
-    'field_ssn',
-    'field_confirm_ssn',
-    'pass',
-  ];
+  $config = \Drupal::config('uceap_logging.settings');
+  $sensitive_fields = $config->get('sensitive_fields') ?? [];
 
   $changes = [];
   $field_definitions = $entity->getFieldDefinitions();

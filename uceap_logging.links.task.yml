@@ -1,0 +1,13 @@
+# Create a default tab for the system logging page
+system.logging_settings_default:
+  title: 'Settings'
+  route_name: system.logging_settings
+  base_route: system.logging_settings
+  weight: 0
+
+# Add our custom tab
+uceap_logging.settings:
+  title: 'UCEAP Logging'
+  route_name: uceap_logging.settings
+  base_route: system.logging_settings
+  weight: 10

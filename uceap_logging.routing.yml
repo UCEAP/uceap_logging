@@ -1,0 +1,7 @@
+uceap_logging.settings:
+  path: '/admin/config/development/logging/uceap'
+  defaults:
+    _form: '\Drupal\uceap_logging\Form\LoggingSettingsForm'
+    _title: 'Logging Settings'
+  requirements:
+    _permission: 'administer site configuration'
