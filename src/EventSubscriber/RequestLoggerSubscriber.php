@@ -41,6 +41,13 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
   protected $configFactory;
 
   /**
+   * List of sensitive field names that should be masked.
+   *
+   * @var array
+   */
+  protected $sensitiveFields;
+
+  /**
    * Constructs a new RequestLoggerSubscriber.
    *
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
@@ -54,6 +61,10 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
     $this->logger = $logger_factory->get('uceap_request');
     $this->currentUser = $current_user;
     $this->configFactory = $config_factory;
+    
+    // Load sensitive fields configuration once.
+    $config = $this->configFactory->get('uceap_logging.settings');
+    $this->sensitiveFields = $config->get('sensitive_fields') ?? [];
   }
 
   /**
@@ -85,10 +96,9 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
     $log_message = '@method @uri | User: @user_id (@username) | IP: @ip | Referer: @referer | UA: @user_agent';
     if ($request->isMethod('POST')) {
       $post_data = $request->request->all();
-      $config = $this->configFactory->get('uceap_logging.settings');
-      $sensitive_fields = $config->get('sensitive_fields') ?? [];
-      $truncated_data = $this->truncatePostData($post_data, $sensitive_fields);
-      $context['post_data'] = $truncated_data;
+      $truncated_data = $this->truncatePostData($post_data, $this->sensitiveFields);
+      // Serialize POST data for safe logging.
+      $context['post_data'] = json_encode($truncated_data);
       $log_message .= ' | POST: @post_data';
     }
 
@@ -106,7 +116,7 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
    * @return array
    *   The POST data with truncated and masked values.
    */
-  protected function truncatePostData(array $data, array $sensitive_fields = []) {
+  protected function truncatePostData(array $data, array $sensitive_fields) {
     $truncated = [];
     foreach ($data as $key => $value) {
       // Mask sensitive fields.
