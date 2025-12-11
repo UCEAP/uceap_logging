@@ -9,7 +9,7 @@ use Drupal\Core\Queue\QueueInterface;
 /**
  * Decorator for QueueFactory to log queue item creation.
  */
-class QueueFactoryDecorator extends QueueFactory {
+class LoggingQueueFactory extends QueueFactory {
 
   /**
    * The decorated queue factory.
@@ -52,7 +52,7 @@ class QueueFactoryDecorator extends QueueFactory {
     $queue = $this->decoratedFactory->get($name, $reliable);
 
     // Wrap the queue with our logger.
-    return new QueueLogger($queue, $this->loggerFactory, $name);
+    return new LoggingQueue($queue, $this->loggerFactory, $name);
   }
 
 }

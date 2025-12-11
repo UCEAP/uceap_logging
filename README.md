@@ -178,4 +178,4 @@ In addition to user-configured sensitive fields, the following field types are a
 To change these channel names, update the logger calls in:
 - `src/EventSubscriber/RequestLoggerSubscriber.php` (line 39)
 - `uceap_logging.module` (lines 22, 45, 63)
-- `src/Queue/QueueLogger.php` (line 46)
+- `src/Queue/LoggingQueue.php` (line 46)

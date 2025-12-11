@@ -8,7 +8,7 @@ use Drupal\Core\Queue\QueueInterface;
 /**
  * Decorator for queue objects to log createItem operations.
  */
-class QueueLogger implements QueueInterface {
+class LoggingQueue implements QueueInterface {
 
   /**
    * The decorated queue object.
@@ -32,7 +32,7 @@ class QueueLogger implements QueueInterface {
   protected $queueName;
 
   /**
-   * Constructs a QueueLogger object.
+   * Constructs a LoggingQueue object.
    *
    * @param \Drupal\Core\Queue\QueueInterface $queue
    *   The queue object to decorate.

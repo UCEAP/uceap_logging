@@ -12,7 +12,7 @@ services:
       - { name: monolog.processor }
 
   uceap_logging.queue_factory:
-    class: Drupal\uceap_logging\Queue\QueueFactoryDecorator
+    class: Drupal\uceap_logging\Queue\LoggingQueueFactory
     decorates: queue
     decoration_priority: -100
     calls:
