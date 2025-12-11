@@ -109,7 +109,7 @@ class QueueLogger implements QueueInterface {
    * {@inheritdoc}
    */
   public function deleteItem($item) {
-    $this->queue->deleteItem($item);
+    return $this->queue->deleteItem($item);
   }
 
   /**
@@ -123,14 +123,14 @@ class QueueLogger implements QueueInterface {
    * {@inheritdoc}
    */
   public function createQueue() {
-    $this->queue->createQueue();
+    return $this->queue->createQueue();
   }
 
   /**
    * {@inheritdoc}
    */
   public function deleteQueue() {
-    $this->queue->deleteQueue();
+    return $this->queue->deleteQueue();
   }
 
 }
