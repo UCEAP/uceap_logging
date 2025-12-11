@@ -10,3 +10,8 @@ services:
     arguments: ['@request_stack']
     tags:
       - { name: monolog.processor }
+
+  uceap_logging.queue_factory:
+    class: Drupal\uceap_logging\Queue\LoggingQueueFactory
+    decorates: queue
+    arguments: ['@uceap_logging.queue_factory.inner', '@logger.factory']

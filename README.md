@@ -23,13 +23,26 @@ A reusable Drupal module that provides comprehensive logging for HTTP requests a
 - For **delete** operations:
   - Entity type, bundle, label, and ID
 
-### 3. Structured Context for CloudWatch
+### 3. Queue Item Logging
+- Logs all queue operations to the `uceap_queue` channel:
+  - **Item added**: Queue name, item data (serialized)
+  - **Item claimed**: Queue name, item ID, lease time (if explicitly provided)
+  - **Item released**: Queue name, item ID
+  - **Item deleted**: Queue name, item ID
+- Provides complete visibility into queue lifecycle
+- Uses a transparent service decorator pattern that preserves all queue implementation behaviors (including different default lease times)
+
+### 4. Structured Context for CloudWatch
 All logs include queryable JSON metadata:
 - `entity_type` - The entity type (user, node, etc.)
 - `bundle` - The bundle/content type
 - `entity_id` - The entity ID
 - `operation` - One of: `create`, `update`, or `delete`
 - `field_changes` - Map of changed fields with old/new values (updates only)
+- `queue_name` - The queue name (queue logs only)
+- `queue_data` - The serialized queue item data (for queue item additions)
+- `item_id` - The queue item ID (for claim/release/delete operations)
+- `lease_time` - The lease time in seconds (for claim operations, when explicitly provided)
 
 ## Prerequisites
 
@@ -60,6 +73,7 @@ Subclass the `CloudWatchClientFactory` to configure AWS credentials and log grou
 Once enabled, the module automatically logs:
 - All HTTP requests
 - All content entity operations (create, update, delete)
+- All queue item additions
 
 ### Viewing Logs
 
@@ -70,8 +84,11 @@ drush watchdog:show --type=uceap_request
 # View all entity CRUD logs
 drush watchdog:show --type=uceap_entity_crud
 
+# View all queue logs
+drush watchdog:show --type=uceap_queue
+
 # View recent logs
-drush watchdog:show | grep -E "(uceap_request|uceap_entity_crud)"
+drush watchdog:show | grep -E "(uceap_request|uceap_entity_crud|uceap_queue)"
 ```
 
 ## CloudWatch Integration
@@ -162,7 +179,9 @@ In addition to user-configured sensitive fields, the following field types are a
 
 - **Request logging**: `uceap_request`
 - **Entity logging**: `uceap_entity_crud`
+- **Queue logging**: `uceap_queue`
 
 To change these channel names, update the logger calls in:
 - `src/EventSubscriber/RequestLoggerSubscriber.php` (line 39)
 - `uceap_logging.module` (lines 22, 45, 63)
+- `src/Queue/LoggingQueue.php` (createItem method)
