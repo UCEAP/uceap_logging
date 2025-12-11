@@ -1,6 +1,6 @@
 # UCEAP Logging Module
 
-A reusable Drupal module that provides comprehensive logging for HTTP requests and entity CRUD operations with CloudWatch integration.
+A reusable Drupal module that provides comprehensive logging for HTTP requests, entity CRUD operations, and queue operations with CloudWatch integration.
 
 ## Features
 
@@ -23,7 +23,14 @@ A reusable Drupal module that provides comprehensive logging for HTTP requests a
 - For **delete** operations:
   - Entity type, bundle, label, and ID
 
-### 3. Structured Context for CloudWatch
+### 3. Queue Logging
+- Logs all queue item creation operations to the `uceap_queue` channel
+- Captures:
+  - Queue name
+  - Item data (truncated if longer than 200 characters)
+  - Operation type
+
+### 4. Structured Context for CloudWatch
 All logs include queryable JSON metadata:
 - `entity_type` - The entity type (user, node, etc.)
 - `bundle` - The bundle/content type
@@ -60,6 +67,7 @@ Subclass the `CloudWatchClientFactory` to configure AWS credentials and log grou
 Once enabled, the module automatically logs:
 - All HTTP requests
 - All content entity operations (create, update, delete)
+- All queue item creation operations
 
 ### Viewing Logs
 
@@ -70,8 +78,11 @@ drush watchdog:show --type=uceap_request
 # View all entity CRUD logs
 drush watchdog:show --type=uceap_entity_crud
 
+# View all queue logs
+drush watchdog:show --type=uceap_queue
+
 # View recent logs
-drush watchdog:show | grep -E "(uceap_request|uceap_entity_crud)"
+drush watchdog:show | grep -E "(uceap_request|uceap_entity_crud|uceap_queue)"
 ```
 
 ## CloudWatch Integration
@@ -162,7 +173,9 @@ In addition to user-configured sensitive fields, the following field types are a
 
 - **Request logging**: `uceap_request`
 - **Entity logging**: `uceap_entity_crud`
+- **Queue logging**: `uceap_queue`
 
 To change these channel names, update the logger calls in:
 - `src/EventSubscriber/RequestLoggerSubscriber.php` (line 39)
 - `uceap_logging.module` (lines 22, 45, 63)
+- `src/Queue/QueueLogger.php` (line 46)
