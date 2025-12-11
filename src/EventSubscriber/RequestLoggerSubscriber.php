@@ -129,7 +129,9 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
     foreach ($data as $key => $value) {
       // Skip uploaded files - they're not useful in logs.
       if ($value instanceof \Symfony\Component\HttpFoundation\File\UploadedFile) {
-        $truncated[$key] = '[FILE: ' . $value->getClientOriginalName() . ']';
+        // Sanitize filename to prevent log injection.
+        $filename = preg_replace('/[^\w\-\.]/', '_', $value->getClientOriginalName());
+        $truncated[$key] = '[FILE: ' . $filename . ']';
         continue;
       }
       
