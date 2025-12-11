@@ -65,7 +65,39 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
       '@referer' => $request->headers->get('referer', 'none'),
     ];
 
+    // Add POST data if this is a POST request.
+    if ($request->isMethod('POST')) {
+      $post_data = $request->request->all();
+      $truncated_data = $this->truncatePostData($post_data);
+      $context['post_data'] = $truncated_data;
+    }
+
     $this->logger->info('@method @uri | User: @user_id (@username) | IP: @ip | Referer: @referer | UA: @user_agent', $context);
+  }
+
+  /**
+   * Truncates POST data field values to 100 characters.
+   *
+   * @param array $data
+   *   The POST data array.
+   *
+   * @return array
+   *   The POST data with truncated values.
+   */
+  protected function truncatePostData(array $data) {
+    $truncated = [];
+    foreach ($data as $key => $value) {
+      if (is_array($value)) {
+        $truncated[$key] = $this->truncatePostData($value);
+      }
+      elseif (is_string($value) && strlen($value) > 100) {
+        $truncated[$key] = substr($value, 0, 100) . '...';
+      }
+      else {
+        $truncated[$key] = $value;
+      }
+    }
+    return $truncated;
   }
 
   /**
