@@ -20,6 +20,11 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
   const POST_FIELD_MAX_LENGTH = 100;
 
   /**
+   * Base log message format.
+   */
+  const LOG_MESSAGE_FORMAT = '@method @uri | User: @user_id (@username) | IP: @ip | Referer: @referer | UA: @user_agent';
+
+  /**
    * The logger channel.
    *
    * @var \Drupal\Core\Logger\LoggerChannelInterface
@@ -93,13 +98,16 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
     ];
 
     // Add POST data if this is a POST request.
-    $log_message = '@method @uri | User: @user_id (@username) | IP: @ip | Referer: @referer | UA: @user_agent';
+    $log_message = self::LOG_MESSAGE_FORMAT;
     if ($request->isMethod('POST')) {
       $post_data = $request->request->all();
       $truncated_data = $this->truncatePostData($post_data, $this->sensitiveFields);
       // Serialize POST data for safe logging.
-      $context['post_data'] = json_encode($truncated_data);
-      $log_message .= ' | POST: @post_data';
+      $json_data = json_encode($truncated_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+      if ($json_data !== FALSE) {
+        $context['post_data'] = $json_data;
+        $log_message .= ' | POST: @post_data';
+      }
     }
 
     $this->logger->info($log_message, $context);
@@ -119,6 +127,12 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
   protected function truncatePostData(array $data, array $sensitive_fields) {
     $truncated = [];
     foreach ($data as $key => $value) {
+      // Skip uploaded files - they're not useful in logs.
+      if ($value instanceof \Symfony\Component\HttpFoundation\File\UploadedFile) {
+        $truncated[$key] = '[FILE: ' . $value->getClientOriginalName() . ']';
+        continue;
+      }
+      
       // Mask sensitive fields.
       if (in_array($key, $sensitive_fields)) {
         $truncated[$key] = '***MASKED***';
@@ -129,8 +143,12 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
       elseif (is_string($value) && strlen($value) > self::POST_FIELD_MAX_LENGTH) {
         $truncated[$key] = substr($value, 0, self::POST_FIELD_MAX_LENGTH) . '...';
       }
-      else {
+      elseif (is_scalar($value) || is_null($value)) {
         $truncated[$key] = $value;
+      }
+      else {
+        // Handle non-serializable objects.
+        $truncated[$key] = '[' . gettype($value) . ']';
       }
     }
     return $truncated;
