@@ -84,6 +84,10 @@ class QueueLogger implements QueueInterface {
     }
     elseif (is_array($data) || is_object($data)) {
       $json = json_encode($data);
+      if ($json === FALSE) {
+        // Handle encoding failure (circular references, invalid UTF-8, etc.).
+        return '[JSON encoding failed: ' . gettype($data) . ']';
+      }
       return strlen($json) > 200 ? substr($json, 0, 200) . '...' : $json;
     }
     else {

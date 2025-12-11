@@ -50,7 +50,7 @@ class QueueFactoryDecorator extends QueueFactory {
    */
   public function get($name, $reliable = FALSE): QueueInterface {
     $queue = $this->decoratedFactory->get($name, $reliable);
-    
+
     // Wrap the queue with our logger.
     return new QueueLogger($queue, $this->loggerFactory, $name);
   }
