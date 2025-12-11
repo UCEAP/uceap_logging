@@ -27,7 +27,7 @@ A reusable Drupal module that provides comprehensive logging for HTTP requests, 
 - Logs all queue item creation operations to the `uceap_queue` channel
 - Captures:
   - Queue name
-  - Item data (truncated if longer than 200 characters)
+  - Item data (truncated if longer than 2000 characters)
   - Operation type
 
 ### 4. Structured Context for CloudWatch

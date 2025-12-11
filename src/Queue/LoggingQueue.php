@@ -80,7 +80,7 @@ class LoggingQueue implements QueueInterface {
   protected function formatData($data) {
     if (is_scalar($data)) {
       $str = (string) $data;
-      return strlen($str) > 200 ? substr($str, 0, 200) . '...' : $str;
+      return strlen($str) > 2000 ? substr($str, 0, 2000) . '...' : $str;
     }
     elseif (is_array($data) || is_object($data)) {
       $json = json_encode($data);
@@ -88,7 +88,7 @@ class LoggingQueue implements QueueInterface {
         // Handle encoding failure (circular references, invalid UTF-8, etc.).
         return '[JSON encoding failed for ' . gettype($data) . ': ' . json_last_error_msg() . ']';
       }
-      return strlen($json) > 200 ? substr($json, 0, 200) . '...' : $json;
+      return strlen($json) > 2000 ? substr($json, 0, 2000) . '...' : $json;
     }
     else {
       return gettype($data);
@@ -105,8 +105,8 @@ class LoggingQueue implements QueueInterface {
   /**
    * {@inheritdoc}
    */
-  public function claimItem($lease_time = 3600) {
-    return $this->queue->claimItem($lease_time);
+  public function claimItem($lease_time = NULL) {
+    return $this->queue->claimItem(...func_get_args());
   }
 
   /**
