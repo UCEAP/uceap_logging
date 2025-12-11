@@ -48,7 +48,7 @@ class QueueFactoryDecorator extends QueueFactory {
   /**
    * {@inheritdoc}
    */
-  public function get($name, $reliable = FALSE): QueueInterface {
+  public function get($name, $reliable = false): QueueInterface {
     $queue = $this->decoratedFactory->get($name, $reliable);
 
     // Wrap the queue with our logger.
