@@ -2,6 +2,7 @@
 
 namespace Drupal\uceap_logging\EventSubscriber;
 
+use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -12,6 +13,11 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * Event subscriber to log all HTTP requests.
  */
 class RequestLoggerSubscriber implements EventSubscriberInterface {
+
+  /**
+   * Maximum length for POST field values before truncation.
+   */
+  const POST_FIELD_MAX_LENGTH = 100;
 
   /**
    * The logger channel.
@@ -28,16 +34,26 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
   protected $currentUser;
 
   /**
+   * The config factory.
+   *
+   * @var \Drupal\Core\Config\ConfigFactoryInterface
+   */
+  protected $configFactory;
+
+  /**
    * Constructs a new RequestLoggerSubscriber.
    *
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    *   The logger factory.
    * @param \Drupal\Core\Session\AccountInterface $current_user
    *   The current user.
+   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
+   *   The config factory.
    */
-  public function __construct(LoggerChannelFactoryInterface $logger_factory, AccountInterface $current_user) {
+  public function __construct(LoggerChannelFactoryInterface $logger_factory, AccountInterface $current_user, ConfigFactoryInterface $config_factory) {
     $this->logger = $logger_factory->get('uceap_request');
     $this->currentUser = $current_user;
+    $this->configFactory = $config_factory;
   }
 
   /**
@@ -66,32 +82,42 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
     ];
 
     // Add POST data if this is a POST request.
+    $log_message = '@method @uri | User: @user_id (@username) | IP: @ip | Referer: @referer | UA: @user_agent';
     if ($request->isMethod('POST')) {
       $post_data = $request->request->all();
-      $truncated_data = $this->truncatePostData($post_data);
+      $config = $this->configFactory->get('uceap_logging.settings');
+      $sensitive_fields = $config->get('sensitive_fields') ?? [];
+      $truncated_data = $this->truncatePostData($post_data, $sensitive_fields);
       $context['post_data'] = $truncated_data;
+      $log_message .= ' | POST: @post_data';
     }
 
-    $this->logger->info('@method @uri | User: @user_id (@username) | IP: @ip | Referer: @referer | UA: @user_agent', $context);
+    $this->logger->info($log_message, $context);
   }
 
   /**
-   * Truncates POST data field values to 100 characters.
+   * Truncates POST data field values to maximum length and masks sensitive fields.
    *
    * @param array $data
    *   The POST data array.
+   * @param array $sensitive_fields
+   *   List of field names to mask.
    *
    * @return array
-   *   The POST data with truncated values.
+   *   The POST data with truncated and masked values.
    */
-  protected function truncatePostData(array $data) {
+  protected function truncatePostData(array $data, array $sensitive_fields = []) {
     $truncated = [];
     foreach ($data as $key => $value) {
-      if (is_array($value)) {
-        $truncated[$key] = $this->truncatePostData($value);
+      // Mask sensitive fields.
+      if (in_array($key, $sensitive_fields)) {
+        $truncated[$key] = '***MASKED***';
       }
-      elseif (is_string($value) && strlen($value) > 100) {
-        $truncated[$key] = substr($value, 0, 100) . '...';
+      elseif (is_array($value)) {
+        $truncated[$key] = $this->truncatePostData($value, $sensitive_fields);
+      }
+      elseif (is_string($value) && strlen($value) > self::POST_FIELD_MAX_LENGTH) {
+        $truncated[$key] = substr($value, 0, self::POST_FIELD_MAX_LENGTH) . '...';
       }
       else {
         $truncated[$key] = $value;
