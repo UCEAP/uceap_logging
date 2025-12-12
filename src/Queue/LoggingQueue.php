@@ -61,7 +61,7 @@ class LoggingQueue implements QueueInterface {
    */
   public function createItem($data) {
     $this->log('Queue item added to @queue', [
-      'queue_data' => json_encode($data),
+      'queue_data' => $data,
     ]);
 
     return $this->decoratedQueue->createItem($data);
