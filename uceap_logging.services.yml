@@ -1,9 +1,25 @@
 services:
   uceap_logging.request_logger_subscriber:
     class: Drupal\uceap_logging\EventSubscriber\RequestLoggerSubscriber
-    arguments: ['@logger.factory', '@current_user']
+    arguments: ['@logger.factory', '@current_user', '@uceap_logging.uri_masker']
     tags:
       - { name: event_subscriber }
+
+  uceap_logging.uri_masker:
+    class: Drupal\uceap_logging\Logger\UriMasker
+    arguments: ['@config.factory']
+
+  uceap_logging.masking_request_uri_processor:
+    class: Drupal\uceap_logging\Logger\MaskingRequestUriProcessor
+    decorates: monolog.processor.request_uri
+    arguments: ['@uceap_logging.masking_request_uri_processor.inner', '@uceap_logging.uri_masker']
+    shared: false
+
+  uceap_logging.masking_message_placeholder_processor:
+    class: Drupal\uceap_logging\Logger\MaskingMessagePlaceholderProcessor
+    decorates: monolog.processor.message_placeholder
+    arguments: ['@uceap_logging.masking_message_placeholder_processor.inner', '@uceap_logging.uri_masker']
+    shared: false
 
   uceap_logging.session_processor:
     class: Drupal\uceap_logging\Logger\SessionProcessor

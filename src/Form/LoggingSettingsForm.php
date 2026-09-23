@@ -38,6 +38,14 @@ class LoggingSettingsForm extends ConfigFormBase {
       '#rows' => 10,
     ];
 
+    $form['sensitive_query_parameters'] = [
+      '#type' => 'textarea',
+      '#title' => $this->t('Sensitive Query Parameters'),
+      '#description' => $this->t('Enter query parameter names (one per line) whose values should be masked wherever the request URI is logged: the request log line and the request URI attached to every other log record. Names are matched case-insensitively.'),
+      '#default_value' => implode("\n", $config->get('sensitive_query_parameters') ?? []),
+      '#rows' => 5,
+    ];
+
     $form['help'] = [
       '#type' => 'details',
       '#title' => $this->t('Examples'),
@@ -63,20 +71,30 @@ class LoggingSettingsForm extends ConfigFormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
-    // Convert textarea input to array.
-    $sensitive_fields_raw = $form_state->getValue('sensitive_fields');
-    $sensitive_fields = array_filter(
-      array_map('trim', explode("\n", $sensitive_fields_raw)),
-      function ($field) {
-        return !empty($field);
-      }
-    );
-
     $this->config('uceap_logging.settings')
-      ->set('sensitive_fields', array_values($sensitive_fields))
+      ->set('sensitive_fields', $this->textareaToList($form_state->getValue('sensitive_fields')))
+      ->set('sensitive_query_parameters', $this->textareaToList($form_state->getValue('sensitive_query_parameters')))
       ->save();
 
     parent::submitForm($form, $form_state);
+  }
+
+  /**
+   * Converts one-per-line textarea input to a list of non-empty values.
+   *
+   * @param string $raw
+   *   The textarea input.
+   *
+   * @return string[]
+   *   The trimmed, non-empty lines.
+   */
+  protected function textareaToList(string $raw): array {
+    return array_values(array_filter(
+      array_map('trim', explode("\n", $raw)),
+      function ($value) {
+        return !empty($value);
+      }
+    ));
   }
 
 }

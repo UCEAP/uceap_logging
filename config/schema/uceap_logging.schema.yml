@@ -8,3 +8,9 @@ uceap_logging.settings:
       sequence:
         type: string
         label: 'Field name'
+    sensitive_query_parameters:
+      type: sequence
+      label: 'Sensitive query parameters'
+      sequence:
+        type: string
+        label: 'Query parameter name'
