@@ -12,6 +12,7 @@ A reusable Drupal module that provides comprehensive logging for HTTP requests a
   - Client IP address
   - User agent
   - Referer
+- Masks the values of configured query parameters (see [Sensitive Query Parameter Masking](#sensitive-query-parameter-masking)) in the logged URI, in the `extra.request_uri` that Monolog adds to every log record, and in any message's `@uri` placeholder
 
 ### 2. Entity CRUD Logging
 - Logs all content entity create, update, and delete operations to the `uceap_entity_crud` channel
@@ -174,6 +175,34 @@ In addition to user-configured sensitive fields, the following field types are a
 - Computed fields (derived values)
 - Internal fields (system-managed)
 - Specific metadata fields: `changed`, `revision_timestamp`, `revision_uid`, `revision_log`
+
+### Sensitive Query Parameter Masking
+
+Some clients authenticate by passing credentials in the query string (for example, a payment postback sending `?operator=…&password=…`). The module masks the values of configured query parameters wherever the request URI is logged:
+
+- the `@uri` placeholder in the `uceap_request` access log line, and
+- the `extra.request_uri` field that Monolog's `request_uri` processor adds to every record written during the request (the module decorates `monolog.processor.request_uri`), and
+- any message's `@uri` placeholder, such as core's "access denied" and "page not found" lines for a rejected request (the module decorates `monolog.processor.message_placeholder`).
+
+Parameter names are matched case-insensitively. Only the value is replaced, so the rest of the URI stays useful for debugging:
+
+```
+GET /finance/transaction/payment?operator=cashnet&password=****MASKED****&command=post
+```
+
+#### Default Sensitive Query Parameters
+
+By default, the following parameter has its value masked:
+- `password`
+
+#### Configuring Sensitive Query Parameters
+
+1. Navigate to **Configuration** > **Development** > **Logging and errors** (`/admin/config/development/logging`)
+2. Click on the **UCEAP Logging** tab
+3. Enter query parameter names (one per line) in the "Sensitive Query Parameters" textarea
+4. Click "Save configuration"
+
+Or set `sensitive_query_parameters` in `uceap_logging.settings` configuration.
 
 ### Logger Channels
 

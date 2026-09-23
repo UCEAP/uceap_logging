@@ -4,6 +4,7 @@ namespace Drupal\uceap_logging\EventSubscriber;
 
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Session\AccountInterface;
+use Drupal\uceap_logging\Logger\UriMasker;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -28,16 +29,26 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
   protected $currentUser;
 
   /**
+   * The URI masker.
+   *
+   * @var \Drupal\uceap_logging\Logger\UriMasker
+   */
+  protected $uriMasker;
+
+  /**
    * Constructs a new RequestLoggerSubscriber.
    *
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger_factory
    *   The logger factory.
    * @param \Drupal\Core\Session\AccountInterface $current_user
    *   The current user.
+   * @param \Drupal\uceap_logging\Logger\UriMasker $uri_masker
+   *   The URI masker.
    */
-  public function __construct(LoggerChannelFactoryInterface $logger_factory, AccountInterface $current_user) {
+  public function __construct(LoggerChannelFactoryInterface $logger_factory, AccountInterface $current_user, UriMasker $uri_masker) {
     $this->logger = $logger_factory->get('uceap_request');
     $this->currentUser = $current_user;
+    $this->uriMasker = $uri_masker;
   }
 
   /**
@@ -57,7 +68,7 @@ class RequestLoggerSubscriber implements EventSubscriberInterface {
     // Gather request information.
     $context = [
       '@method' => $request->getMethod(),
-      '@uri' => $request->getRequestUri(),
+      '@uri' => $this->uriMasker->mask($request->getRequestUri()),
       '@ip' => $request->getClientIp(),
       '@user_id' => $this->currentUser->id(),
       '@username' => $this->currentUser->getAccountName(),
