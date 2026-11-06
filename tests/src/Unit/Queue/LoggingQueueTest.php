@@ -4,6 +4,8 @@ namespace Drupal\Tests\uceap_logging\Unit\Queue;
 
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
+use Drupal\Core\Queue\DelayableQueueInterface;
+use Drupal\Core\Queue\QueueGarbageCollectionInterface;
 use Drupal\Core\Queue\QueueInterface;
 use Drupal\Tests\UnitTestCase;
 use Drupal\uceap_logging\Queue\LoggingQueue;
@@ -85,7 +87,7 @@ class LoggingQueueTest extends UnitTestCase {
         $this->callback(function ($context) use ($data) {
           return $context['@queue'] === 'test_queue'
             && $context['queue_name'] === 'test_queue'
-            && json_decode($context['queue_data'], TRUE) === $data;
+            && $context['queue_data'] === $data;
         })
       );
 
@@ -383,4 +385,73 @@ class LoggingQueueTest extends UnitTestCase {
     $this->assertTrue($result);
   }
 
+  /**
+   * Tests that garbage collection is a no-op for queues without support.
+   *
+   * @covers ::garbageCollection
+   */
+  public function testGarbageCollectionWithoutSupport(): void {
+    $this->logger->expects($this->never())->method($this->anything());
+
+    // The decorated queue only implements QueueInterface.
+    $this->loggingQueue->garbageCollection();
+  }
+
+  /**
+   * Tests that garbage collection is delegated to the decorated queue.
+   *
+   * @covers ::garbageCollection
+   */
+  public function testGarbageCollectionDelegates(): void {
+    $decorated = $this->createMock(GarbageCollectableQueueInterface::class);
+    $decorated->expects($this->once())->method('garbageCollection');
+    $this->logger->expects($this->never())->method($this->anything());
+
+    $queue = new LoggingQueue($decorated, $this->loggerFactory, 'test_queue');
+    $queue->garbageCollection();
+  }
+
+  /**
+   * Tests that delayItem logs and delegates to delayable queues.
+   *
+   * @covers ::delayItem
+   */
+  public function testDelayItemDelegates(): void {
+    $item = (object) ['item_id' => 55];
+    $decorated = $this->createMock(DelayableQueueTestInterface::class);
+    $decorated->expects($this->once())
+      ->method('delayItem')
+      ->with($item, 600)
+      ->willReturn(TRUE);
+    $this->logger->expects($this->once())
+      ->method('info')
+      ->with(
+        'Queue item delayed in @queue',
+        $this->callback(fn ($context) => $context['item_id'] === 55 && $context['delay'] === 600)
+      );
+
+    $queue = new LoggingQueue($decorated, $this->loggerFactory, 'test_queue');
+    $this->assertTrue($queue->delayItem($item, 600));
+  }
+
+  /**
+   * Tests that delayItem reports failure for queues without support.
+   *
+   * @covers ::delayItem
+   */
+  public function testDelayItemWithoutSupport(): void {
+    $this->logger->expects($this->never())->method($this->anything());
+    $this->assertFalse($this->loggingQueue->delayItem((object) ['item_id' => 55], 600));
+  }
+
 }
+
+/**
+ * A queue that supports garbage collection, for mocking.
+ */
+interface GarbageCollectableQueueInterface extends QueueInterface, QueueGarbageCollectionInterface {}
+
+/**
+ * A queue that supports delaying items, for mocking.
+ */
+interface DelayableQueueTestInterface extends QueueInterface, DelayableQueueInterface {}

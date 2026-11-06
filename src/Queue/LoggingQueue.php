@@ -3,17 +3,20 @@
 namespace Drupal\uceap_logging\Queue;
 
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Queue\DelayableQueueInterface;
+use Drupal\Core\Queue\QueueGarbageCollectionInterface;
 use Drupal\Core\Queue\QueueInterface;
 
 /**
- * Decorates queue objects to log item creation.
+ * Decorates queue objects to log queue operations.
  *
  * This decorator wraps any QueueInterface implementation and logs when items
- * are added to the queue. All other queue methods are transparently delegated
- * to the underlying queue implementation using __call(), which preserves
- * default parameter values (such as lease times in claimItem()).
+ * are added, claimed, deleted, released, or delayed. Every operation is
+ * delegated to the underlying queue. Garbage collection and delaying are
+ * passed through only when the underlying queue supports them, so system_cron
+ * still releases expired claims.
  */
-class LoggingQueue implements QueueInterface {
+class LoggingQueue implements QueueInterface, QueueGarbageCollectionInterface, DelayableQueueInterface {
 
   /**
    * The decorated queue.
@@ -132,6 +135,34 @@ class LoggingQueue implements QueueInterface {
    */
   public function deleteQueue() {
     $this->decoratedQueue->deleteQueue();
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Without this, system_cron would never reach the decorated queue's garbage
+   * collection, so items claimed by an interrupted run would stay claimed.
+   */
+  public function garbageCollection() {
+    if ($this->decoratedQueue instanceof QueueGarbageCollectionInterface) {
+      $this->decoratedQueue->garbageCollection();
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function delayItem($item, int $delay) {
+    if (!$this->decoratedQueue instanceof DelayableQueueInterface) {
+      return FALSE;
+    }
+
+    $result = $this->decoratedQueue->delayItem($item, $delay);
+    $this->log('Queue item delayed in @queue', [
+      'item_id' => $item->item_id ?? NULL,
+      'delay' => $delay,
+    ]);
+    return $result;
   }
 
   /**
