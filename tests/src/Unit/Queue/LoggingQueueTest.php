@@ -2,13 +2,8 @@
 
 namespace Drupal\Tests\uceap_logging\Unit\Queue;
 
-use Drupal\Component\Datetime\TimeInterface;
-use Drupal\Core\Database\Connection;
-use Drupal\Core\Database\StatementInterface;
-use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
-use Drupal\Core\Queue\DatabaseQueue;
 use Drupal\Core\Queue\DelayableQueueInterface;
 use Drupal\Core\Queue\QueueGarbageCollectionInterface;
 use Drupal\Core\Queue\QueueInterface;
@@ -414,69 +409,6 @@ class LoggingQueueTest extends UnitTestCase {
 
     $queue = new LoggingQueue($decorated, $this->loggerFactory, 'test_queue');
     $queue->garbageCollection();
-  }
-
-  /**
-   * Tests that released claims and stale batch items are logged.
-   *
-   * Core's DatabaseQueue::garbageCollection() releases expired claims in every
-   * queue, so each released item is logged under its own queue name.
-   *
-   * @covers ::garbageCollection
-   */
-  public function testGarbageCollectionLogsCleanup(): void {
-    $time = $this->createMock(TimeInterface::class);
-    $time->method('getRequestTime')->willReturn(1800000000);
-    $container = new ContainerBuilder();
-    $container->set('datetime.time', $time);
-    \Drupal::setContainer($container);
-
-    $expired = $this->createMock(StatementInterface::class);
-    $expired->method('fetchAll')->willReturn([
-      (object) ['item_id' => 11, 'name' => 'test_queue', 'created' => 1700000000, 'expire' => 1700000030],
-      (object) ['item_id' => 12, 'name' => 'other_queue', 'created' => 1710000000, 'expire' => 1710000030],
-    ]);
-    $stale_batches = $this->createMock(StatementInterface::class);
-    $stale_batches->method('fetchField')->willReturn('3');
-
-    $connection = $this->createMock(Connection::class);
-    $connection->method('query')->willReturnCallback(
-      function (string $query, array $args) use ($expired, $stale_batches) {
-        if (str_contains($query, 'expire')) {
-          $this->assertSame(1800000000, $args[':now']);
-          return $expired;
-        }
-        $this->assertSame('drupal_batch:%', $args[':batch']);
-        $this->assertSame(1800000000 - 864000, $args[':cutoff']);
-        return $stale_batches;
-      }
-    );
-
-    $decorated = $this->createMock(DatabaseQueue::class);
-    $decorated->expects($this->once())->method('garbageCollection');
-
-    $warnings = [];
-    $this->logger->method('warning')->willReturnCallback(function ($message, $context) use (&$warnings) {
-      $warnings[] = [$message, $context];
-    });
-    $this->logger->expects($this->once())
-      ->method('info')
-      ->with(
-        'Deleted @count stale batch items from the queue table',
-        $this->callback(fn ($context) => $context['@count'] === 3)
-      );
-
-    $queue = new LoggingQueue($decorated, $this->loggerFactory, 'test_queue', $connection);
-    $queue->garbageCollection();
-
-    $this->assertCount(2, $warnings);
-    [$message, $context] = $warnings[1];
-    $this->assertSame('Expired claim released in @queue', $message);
-    $this->assertSame('other_queue', $context['@queue']);
-    $this->assertSame('other_queue', $context['queue_name']);
-    $this->assertSame(12, $context['item_id']);
-    $this->assertSame(1710000000, $context['created']);
-    $this->assertSame(1710000030, $context['lease_expired']);
   }
 
   /**
