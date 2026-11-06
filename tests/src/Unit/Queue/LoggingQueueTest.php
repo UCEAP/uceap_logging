@@ -2,8 +2,15 @@
 
 namespace Drupal\Tests\uceap_logging\Unit\Queue;
 
+use Drupal\Component\Datetime\TimeInterface;
+use Drupal\Core\Database\Connection;
+use Drupal\Core\Database\StatementInterface;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
 use Drupal\Core\Logger\LoggerChannelInterface;
+use Drupal\Core\Queue\DatabaseQueue;
+use Drupal\Core\Queue\DelayableQueueInterface;
+use Drupal\Core\Queue\QueueGarbageCollectionInterface;
 use Drupal\Core\Queue\QueueInterface;
 use Drupal\Tests\UnitTestCase;
 use Drupal\uceap_logging\Queue\LoggingQueue;
@@ -85,7 +92,7 @@ class LoggingQueueTest extends UnitTestCase {
         $this->callback(function ($context) use ($data) {
           return $context['@queue'] === 'test_queue'
             && $context['queue_name'] === 'test_queue'
-            && json_decode($context['queue_data'], TRUE) === $data;
+            && $context['queue_data'] === $data;
         })
       );
 
@@ -383,4 +390,136 @@ class LoggingQueueTest extends UnitTestCase {
     $this->assertTrue($result);
   }
 
+  /**
+   * Tests that garbage collection is a no-op for queues without support.
+   *
+   * @covers ::garbageCollection
+   */
+  public function testGarbageCollectionWithoutSupport(): void {
+    $this->logger->expects($this->never())->method($this->anything());
+
+    // The decorated queue only implements QueueInterface.
+    $this->loggingQueue->garbageCollection();
+  }
+
+  /**
+   * Tests that garbage collection is delegated to the decorated queue.
+   *
+   * @covers ::garbageCollection
+   */
+  public function testGarbageCollectionDelegates(): void {
+    $decorated = $this->createMock(GarbageCollectableQueueInterface::class);
+    $decorated->expects($this->once())->method('garbageCollection');
+    $this->logger->expects($this->never())->method($this->anything());
+
+    $queue = new LoggingQueue($decorated, $this->loggerFactory, 'test_queue');
+    $queue->garbageCollection();
+  }
+
+  /**
+   * Tests that released claims and stale batch items are logged.
+   *
+   * Core's DatabaseQueue::garbageCollection() releases expired claims in every
+   * queue, so each released item is logged under its own queue name.
+   *
+   * @covers ::garbageCollection
+   */
+  public function testGarbageCollectionLogsCleanup(): void {
+    $time = $this->createMock(TimeInterface::class);
+    $time->method('getRequestTime')->willReturn(1800000000);
+    $container = new ContainerBuilder();
+    $container->set('datetime.time', $time);
+    \Drupal::setContainer($container);
+
+    $expired = $this->createMock(StatementInterface::class);
+    $expired->method('fetchAll')->willReturn([
+      (object) ['item_id' => 11, 'name' => 'test_queue', 'created' => 1700000000, 'expire' => 1700000030],
+      (object) ['item_id' => 12, 'name' => 'other_queue', 'created' => 1710000000, 'expire' => 1710000030],
+    ]);
+    $stale_batches = $this->createMock(StatementInterface::class);
+    $stale_batches->method('fetchField')->willReturn('3');
+
+    $connection = $this->createMock(Connection::class);
+    $connection->method('query')->willReturnCallback(
+      function (string $query, array $args) use ($expired, $stale_batches) {
+        if (str_contains($query, 'expire')) {
+          $this->assertSame(1800000000, $args[':now']);
+          return $expired;
+        }
+        $this->assertSame('drupal_batch:%', $args[':batch']);
+        $this->assertSame(1800000000 - 864000, $args[':cutoff']);
+        return $stale_batches;
+      }
+    );
+
+    $decorated = $this->createMock(DatabaseQueue::class);
+    $decorated->expects($this->once())->method('garbageCollection');
+
+    $warnings = [];
+    $this->logger->method('warning')->willReturnCallback(function ($message, $context) use (&$warnings) {
+      $warnings[] = [$message, $context];
+    });
+    $this->logger->expects($this->once())
+      ->method('info')
+      ->with(
+        'Deleted @count stale batch items from the queue table',
+        $this->callback(fn ($context) => $context['@count'] === 3)
+      );
+
+    $queue = new LoggingQueue($decorated, $this->loggerFactory, 'test_queue', $connection);
+    $queue->garbageCollection();
+
+    $this->assertCount(2, $warnings);
+    [$message, $context] = $warnings[1];
+    $this->assertSame('Expired claim released in @queue', $message);
+    $this->assertSame('other_queue', $context['@queue']);
+    $this->assertSame('other_queue', $context['queue_name']);
+    $this->assertSame(12, $context['item_id']);
+    $this->assertSame(1710000000, $context['created']);
+    $this->assertSame(1710000030, $context['lease_expired']);
+  }
+
+  /**
+   * Tests that delayItem logs and delegates to delayable queues.
+   *
+   * @covers ::delayItem
+   */
+  public function testDelayItemDelegates(): void {
+    $item = (object) ['item_id' => 55];
+    $decorated = $this->createMock(DelayableQueueTestInterface::class);
+    $decorated->expects($this->once())
+      ->method('delayItem')
+      ->with($item, 600)
+      ->willReturn(TRUE);
+    $this->logger->expects($this->once())
+      ->method('info')
+      ->with(
+        'Queue item delayed in @queue',
+        $this->callback(fn ($context) => $context['item_id'] === 55 && $context['delay'] === 600)
+      );
+
+    $queue = new LoggingQueue($decorated, $this->loggerFactory, 'test_queue');
+    $this->assertTrue($queue->delayItem($item, 600));
+  }
+
+  /**
+   * Tests that delayItem reports failure for queues without support.
+   *
+   * @covers ::delayItem
+   */
+  public function testDelayItemWithoutSupport(): void {
+    $this->logger->expects($this->never())->method($this->anything());
+    $this->assertFalse($this->loggingQueue->delayItem((object) ['item_id' => 55], 600));
+  }
+
 }
+
+/**
+ * A queue that supports garbage collection, for mocking.
+ */
+interface GarbageCollectableQueueInterface extends QueueInterface, QueueGarbageCollectionInterface {}
+
+/**
+ * A queue that supports delaying items, for mocking.
+ */
+interface DelayableQueueTestInterface extends QueueInterface, DelayableQueueInterface {}
